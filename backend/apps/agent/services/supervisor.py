@@ -65,7 +65,7 @@ RESPONSE STYLE:
 - Give the answer directly first.
 - Use clean student-friendly wording.
 - When useful, format academic data in short bullets or short grouped lines.
-- Respond in the same language the student used.""",
+- Always respond in English.""",
     )
 
     lms_actor = create_react_agent(
@@ -87,7 +87,7 @@ STRICT RULES:
 
 RESPONSE STYLE:
 - Be concise and helpful.
-- Respond in the same language the student used.""",
+- Always respond in English.""",
     )
 
     admin_actor = create_react_agent(

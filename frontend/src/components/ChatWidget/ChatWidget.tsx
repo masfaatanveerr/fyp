@@ -123,7 +123,7 @@ export function ChatWidget({
       id: "welcome",
       role: "assistant",
       content:
-        "**Assalam o Alaikum!** Main KFUEIT Agent Assist hun.\n\nAapki attendance, transcript, courses, ya university policies ke bare mein pooch saktay hain.",
+        "**Hello!** I'm KFUEIT Agent Assist.\n\nYou can ask me about your attendance, transcript, courses, or university policies.",
       ts: new Date(),
     },
   ]);
@@ -197,7 +197,7 @@ export function ChatWidget({
           {
             id: makeId(),
             role: "assistant",
-            content: "Backend se connection nahi ho saka. Django server check karein.",
+            content: "Could not connect to backend. Please try again.",
             ts: new Date(),
           },
         ]);
@@ -317,7 +317,7 @@ export function ChatWidget({
           <div className="cw-login">
             <div className="cw-login-icon"><Sparkles size={28} /></div>
             <p className="cw-login-title">KFUEIT Student Portal</p>
-            <p className="cw-login-sub">Apna roll number enter karein</p>
+            <p className="cw-login-sub">Enter your roll number</p>
             <div className="cw-input-wrap" style={{ margin: "0 0 8px" }}>
               <input
                 ref={rollInputRef}
@@ -380,7 +380,7 @@ export function ChatWidget({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                placeholder="Apna sawal likhein..."
+                placeholder="Type your question..."
                 disabled={loading}
               />
               <button
