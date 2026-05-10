@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, urlparse
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
@@ -57,21 +58,57 @@ TEMPLATES = [
 
 # ── Databases ───────────────────────────────────────────────────────────────
 
-_db_options = {}
-if os.getenv("DB_HOST", "localhost") != "localhost":
-    _db_options = {"sslmode": "require"}
+def _postgres_options_from_query(query: str) -> dict:
+    options = {}
+    for key, value in parse_qsl(query):
+        if key in {"sslmode", "connect_timeout", "application_name"}:
+            options[key] = value
+    return options
 
-DATABASES = {
-    "default": {
+
+def _database_from_url(url: str) -> dict:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        raise ImproperlyConfigured("DATABASE_URL must use postgres:// or postgresql://.")
+
+    options = _postgres_options_from_query(parsed.query)
+    if parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        options.setdefault("sslmode", "require")
+
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": parsed.path.lstrip("/"),
+        "USER": parsed.username or "",
+        "PASSWORD": parsed.password or "",
+        "HOST": parsed.hostname or "",
+        "PORT": str(parsed.port or 5432),
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": options,
+    }
+
+
+def _database_from_env() -> dict:
+    db_host = os.getenv("DB_HOST", "localhost")
+    options = {}
+    if db_host not in {"localhost", "127.0.0.1", "::1"}:
+        options = {"sslmode": "require"}
+
+    return {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("DB_NAME", "kfueit_agent"),
         "USER": os.getenv("DB_USER", "postgres"),
         "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "localhost"),
+        "HOST": db_host,
         "PORT": os.getenv("DB_PORT", "5432"),
-        "CONN_MAX_AGE": 0,  # required for Vercel serverless
-        "OPTIONS": _db_options,
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": options,
     }
+
+
+DATABASES = {
+    "default": _database_from_url(os.getenv("DATABASE_URL", ""))
+    if os.getenv("DATABASE_URL")
+    else _database_from_env()
 }
 
 # LMS MySQL connection — only active in production when USE_DUMMY_DATA=False
@@ -133,7 +170,7 @@ _validate_secret_settings()
 CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-CELERY_TASK_ALWAYS_EAGER = os.getenv("VERCEL", "") != ""  # run tasks synchronously on Vercel
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "False") == "True"
 
 # ── n8n Webhook URLs ──────────────────────────────────────────────────────────
 

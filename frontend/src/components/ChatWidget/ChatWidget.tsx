@@ -41,10 +41,10 @@ interface StudentInfo {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const QUICK_PROMPTS = [
-  "Meri attendance kitni hai?",
-  "Mera transcript dikhao",
-  "Current courses kaun se hain?",
-  "KFUEIT attendance policy kya hai?",
+  "What is my attendance?",
+  "Show my transcript",
+  "What are my current courses?",
+  "What is the KFUEIT attendance policy?",
 ];
 
 function makeId() {
