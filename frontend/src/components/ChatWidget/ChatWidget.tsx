@@ -187,7 +187,7 @@ export function ChatWidget({
           {
             id: makeId(),
             role: "assistant",
-            content: data.response || data.error || "Sorry, valid response nahi mila.",
+            content: data.response || data.error || "Sorry, could not get a valid response.",
             ts: new Date(),
           },
         ]);
@@ -222,7 +222,7 @@ export function ChatWidget({
         setStudent((data.profile ?? data) as StudentInfo);
       }
     } catch {
-      setLoginError("Backend se connection nahi ho saka.");
+      setLoginError("Could not connect to backend. Is the server running?");
     } finally {
       setLoginLoading(false);
     }
@@ -235,7 +235,7 @@ export function ChatWidget({
         {
           id: makeId(),
           role: "assistant",
-          content: "Voice call ke liye Vapi configure nahi hai. `frontend/.env` mein `VITE_VAPI_PUBLIC_KEY` aur `VITE_VAPI_ASSISTANT_ID` set karein.",
+          content: "Voice call is not configured. Set `VITE_VAPI_PUBLIC_KEY` and `VITE_VAPI_ASSISTANT_ID` in `frontend/.env`.",
           ts: new Date(),
         },
       ]);
@@ -255,7 +255,7 @@ export function ChatWidget({
           {
             id: makeId(),
             role: "assistant",
-            content: `Call connect nahi ho saka: ${msg}`,
+            content: `Could not start voice call: ${msg}`,
             ts: new Date(),
           },
         ]);

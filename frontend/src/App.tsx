@@ -15,7 +15,7 @@ const STATS = [
 
 export default function App() {
   if (isAdmin) {
-    return <AdminDashboard apiBase="https://fyp-production-f30d.up.railway.app/api/agent" />;
+    return <AdminDashboard apiBase="{import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api/agent"}" />;
   }
 
   return (
@@ -95,7 +95,7 @@ export default function App() {
       <ChatWidget
         agentName="KFUEIT Assistant"
         description="Online · usually replies instantly"
-        apiBase="https://fyp-production-f30d.up.railway.app/api/agent"
+        apiBase="{import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api/agent"}"
         vapiPublicKey={import.meta.env.VITE_VAPI_PUBLIC_KEY}
         vapiAssistantId={import.meta.env.VITE_VAPI_ASSISTANT_ID}
       />
