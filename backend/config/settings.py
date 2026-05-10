@@ -13,6 +13,7 @@ DEBUG = os.getenv("DEBUG", "True") == "True"
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -24,6 +25,14 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "apps.agent",
 ]
+
+UNFOLD = {
+    "SITE_TITLE": "KFUEIT Agent Assist Admin",
+    "SITE_HEADER": "KFUEIT Agent Assist",
+    "SITE_SUBHEADER": "Backend administration",
+    "SITE_SYMBOL": "school",
+    "SHOW_VIEW_ON_SITE": False,
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -186,7 +195,11 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATICFILES_STORAGE = (
+    "django.contrib.staticfiles.storage.StaticFilesStorage"
+    if DEBUG
+    else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
