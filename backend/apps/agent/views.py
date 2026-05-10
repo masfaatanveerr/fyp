@@ -54,7 +54,12 @@ def agent_query(request):
 
     thread_id = f"student_{roll_no}_{session_id}"
 
-    response_text = run_agent(query=query, roll_no=roll_no, thread_id=thread_id)
+    try:
+        response_text = run_agent(query=query, roll_no=roll_no, thread_id=thread_id)
+    except Exception as e:
+        import traceback, logging
+        logging.error("run_agent failed: %s\n%s", e, traceback.format_exc())
+        return JsonResponse({"error": str(e)}, status=500)
 
     return JsonResponse({"response": response_text, "session_id": session_id})
 
