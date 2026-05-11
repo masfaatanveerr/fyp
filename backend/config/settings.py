@@ -181,6 +181,28 @@ CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "False") == "True"
 
+# ── Email (SMTP) ─────────────────────────────────────────────────────────────
+# In development without SMTP configured, emails are printed to the console.
+
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend"
+    if os.getenv("EMAIL_HOST")
+    else "django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@kfueit.edu.pk")
+
+SFSC_EMAIL = os.getenv("SFSC_EMAIL", "sfsc@kfueit.edu.pk")
+
+# ── Auth Token ────────────────────────────────────────────────────────────────
+# Session token expiry in seconds (default 24 h)
+AUTH_TOKEN_MAX_AGE = int(os.getenv("AUTH_TOKEN_MAX_AGE", "86400"))
+
 # ── n8n Webhook URLs ──────────────────────────────────────────────────────────
 
 N8N_WEBHOOK_SEND_EMAIL = os.getenv("N8N_WEBHOOK_SEND_EMAIL", "http://localhost:5678/webhook/send-email")

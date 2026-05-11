@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from apps.agent.models import (
     StudentProfile, CourseEnrollment, AttendanceRecord,
-    TranscriptCourse, SessionalMarks, Complaint
+    TranscriptCourse, SessionalMarks, Complaint, StudentAuth
 )
 
 
@@ -139,6 +139,13 @@ class Command(BaseCommand):
     help = "Seed dummy student data with Masfa's real academic records"
 
     def handle(self, *args, **options):
+        # ── Save existing auth records before cascade-delete ──────────────────
+        # StudentProfile.delete() cascades to StudentAuth, wiping passwords.
+        # We snapshot auth state so custom passwords survive re-seeds/re-deploys.
+        saved_auth: dict[str, tuple[str, bool]] = {}
+        for auth in StudentAuth.objects.select_related("student").all():
+            saved_auth[auth.student.roll_no] = (auth.password_hash, auth.password_changed)
+
         self.stdout.write("Clearing old data...")
         StudentProfile.objects.all().delete()
 
@@ -149,6 +156,7 @@ class Command(BaseCommand):
             self.seed_attendance(student)
             self.seed_transcript(student)
             self.seed_sessional_marks(student)
+            self.seed_auth(student, saved_auth.get(student.roll_no))
             self.stdout.write(f"  Seeded: {student.roll_no} - {student.name}")
 
         self.stdout.write(self.style.SUCCESS(f"Done! Seeded {len(STUDENTS)} students."))
@@ -207,6 +215,20 @@ class Command(BaseCommand):
                     credit_hours=tc["credit_hours"],
                     gpa_earned=round(new_gp * tc["credit_hours"], 1),
                 )
+
+    def seed_auth(self, student, saved: tuple[str, bool] | None = None):
+        """Restore saved password if it existed; otherwise set default (roll_no reversed)."""
+        if saved:
+            password_hash, password_changed = saved
+            StudentAuth.objects.create(
+                student=student,
+                password_hash=password_hash,
+                password_changed=password_changed,
+            )
+        else:
+            auth = StudentAuth(student=student, password_changed=False)
+            auth.set_password(student.roll_no[::-1])
+            auth.save()
 
     def seed_sessional_marks(self, student):
         for course in CURRENT_COURSES:

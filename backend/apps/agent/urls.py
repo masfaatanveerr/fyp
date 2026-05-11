@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("login/", views.login_view, name="agent_login"),
     path("query/", views.agent_query, name="agent_query"),
     path("vapi/", views.vapi_webhook, name="vapi_webhook"),
     path("admin/logs/", views.admin_logs, name="admin_logs"),

@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.hashers import make_password, check_password as django_check_password
 
 
 class StudentProfile(models.Model):
@@ -90,6 +91,38 @@ class Complaint(models.Model):
 
     def __str__(self):
         return f"{self.student.roll_no} - {self.subject} [{self.status}]"
+
+
+class StudentAuth(models.Model):
+    """One-to-one auth record per student. Initial password = reversed roll_no."""
+    student = models.OneToOneField(StudentProfile, on_delete=models.CASCADE, related_name="auth")
+    password_hash = models.CharField(max_length=256)
+    password_changed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def set_password(self, raw_password: str):
+        self.password_hash = make_password(raw_password)
+
+    def check_password(self, raw_password: str) -> bool:
+        return django_check_password(raw_password, self.password_hash)
+
+    def __str__(self):
+        changed = "changed" if self.password_changed else "default"
+        return f"{self.student.roll_no} [{changed}]"
+
+
+class PasswordChangeRequest(models.Model):
+    STATUS_CHOICES = [("pending", "Pending"), ("resolved", "Resolved")]
+    student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name="password_change_requests")
+    requested_password = models.CharField(max_length=256)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    admin_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.student.roll_no} — Request #{self.id} [{self.status}]"
 
 
 class AgentLog(models.Model):

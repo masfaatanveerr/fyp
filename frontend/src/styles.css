@@ -626,6 +626,88 @@ ul     { list-style: none; }
   color: hsl(0 70% 65%);
   text-align: center;
 }
+.cw-login-fields {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.cw-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+.cw-field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cw-field-input {
+  width: 100%;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  color: var(--fg);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.cw-field-input:focus {
+  border-color: hsl(38 70% 56% / 0.5);
+  box-shadow: 0 0 0 2px hsl(38 70% 56% / 0.15);
+}
+.cw-field-input::placeholder { color: var(--text-muted); opacity: 0.7; }
+.cw-field-input:disabled { opacity: 0.5; cursor: not-allowed; }
+.cw-field-input--password { padding-right: 38px; }
+.cw-password-wrap {
+  position: relative;
+  width: 100%;
+}
+.cw-password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+.cw-password-toggle:hover { color: var(--fg); }
+.cw-login-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, hsl(38 70% 52%), hsl(32 75% 44%));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  margin-top: 2px;
+}
+.cw-login-btn:hover:not(:disabled) { opacity: 0.9; }
+.cw-login-btn:active:not(:disabled) { transform: scale(0.98); }
+.cw-login-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.cw-login-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+  margin-top: 6px;
+  opacity: 0.8;
+}
 
 /* ── Footer / input ─────────────────────────────────────────────────────────── */
 .cw-footer {

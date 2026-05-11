@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
@@ -22,7 +23,9 @@ from .models import (
     AttendanceRecord,
     Complaint,
     CourseEnrollment,
+    PasswordChangeRequest,
     SessionalMarks,
+    StudentAuth,
     StudentProfile,
     TranscriptCourse,
 )
@@ -204,6 +207,64 @@ class ComplaintAdmin(ModelAdmin):
     )
     list_filter = ("status", "created_at", "resolved_at")
     ordering = ("-created_at",)
+
+
+@admin.register(StudentAuth)
+class StudentAuthAdmin(ModelAdmin):
+    list_display = ("student", "password_changed", "updated_at")
+    search_fields = ("student__roll_no", "student__name")
+    list_filter = ("password_changed",)
+    ordering = ("student__roll_no",)
+    readonly_fields = ("student", "password_hash", "password_changed", "created_at", "updated_at")
+    actions = ["reset_to_default_password", "unlock_password_change"]
+
+    @admin.action(description="Reset selected students' passwords to default (reversed roll no)")
+    def reset_to_default_password(self, request, queryset):
+        count = 0
+        for auth in queryset.select_related("student"):
+            auth.set_password(auth.student.roll_no[::-1])
+            auth.password_changed = False
+            auth.save()
+            count += 1
+        self.message_user(request, f"Reset {count} password(s) to default.")
+
+    @admin.action(description="Unlock password change (allow student to change again)")
+    def unlock_password_change(self, request, queryset):
+        count = queryset.update(password_changed=False)
+        self.message_user(request, f"Unlocked password change for {count} student(s).")
+
+
+@admin.register(PasswordChangeRequest)
+class PasswordChangeRequestAdmin(ModelAdmin):
+    list_display = ("id", "student", "status", "created_at", "resolved_at")
+    search_fields = ("student__roll_no", "student__name")
+    list_filter = ("status", "created_at")
+    ordering = ("-created_at",)
+    readonly_fields = ("student", "requested_password", "created_at")
+    actions = ["apply_requested_password"]
+
+    def save_model(self, request, obj, form, change):
+        if obj.status == "resolved" and not obj.resolved_at:
+            obj.resolved_at = timezone.now()
+        super().save_model(request, obj, form, change)
+
+    @admin.action(description="Apply requested password and mark as resolved")
+    def apply_requested_password(self, request, queryset):
+        from .models import StudentAuth
+        count = 0
+        for req in queryset.filter(status="pending").select_related("student"):
+            try:
+                auth = req.student.auth
+                auth.set_password(req.requested_password)
+                auth.password_changed = True
+                auth.save()
+                req.status = "resolved"
+                req.resolved_at = timezone.now()
+                req.save()
+                count += 1
+            except StudentAuth.DoesNotExist:
+                pass
+        self.message_user(request, f"Applied and resolved {count} password change request(s).")
 
 
 @admin.register(AgentLog)

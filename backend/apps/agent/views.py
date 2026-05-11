@@ -1,10 +1,31 @@
 import uuid
+import functools
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 import json
 
+from .auth_utils import create_token, verify_token
 from .services.supervisor import run_agent
+
+
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+
+def _require_auth(view_fn):
+    """Decorator: verifies bearer token, injects roll_no as request.authenticated_roll_no."""
+    @functools.wraps(view_fn)
+    def wrapper(request, *args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JsonResponse({"error": "Authentication required."}, status=401)
+        roll_no = verify_token(auth_header[7:])
+        if not roll_no:
+            return JsonResponse(
+                {"error": "Session expired. Please log in again."}, status=401
+            )
+        request.authenticated_roll_no = roll_no
+        return view_fn(request, *args, **kwargs)
+    return wrapper
 
 
 def _validate_roll_no(roll_no: str):
@@ -31,11 +52,59 @@ def _validate_roll_no(roll_no: str):
 
 @csrf_exempt
 @require_POST
+def login_view(request):
+    """
+    POST /api/agent/login/
+    Body: { "roll_no": "...", "password": "..." }
+    Returns: { "token": "...", "student": { roll_no, name, program, section } }
+    """
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+    roll_no = body.get("roll_no", "").strip().upper()
+    password = body.get("password", "")
+
+    if not roll_no or not password:
+        return JsonResponse({"error": "Roll number and password are required."}, status=400)
+
+    from .models import StudentProfile, StudentAuth
+
+    try:
+        student = StudentProfile.objects.select_related("auth").get(roll_no=roll_no)
+    except StudentProfile.DoesNotExist:
+        return JsonResponse({"error": "Invalid roll number or password."}, status=401)
+
+    try:
+        auth = student.auth
+    except StudentAuth.DoesNotExist:
+        return JsonResponse({"error": "Authentication not configured. Contact SFSC."}, status=401)
+
+    if not auth.check_password(password):
+        return JsonResponse({"error": "Invalid roll number or password."}, status=401)
+
+    token = create_token(roll_no)
+    return JsonResponse({
+        "token": token,
+        "student": {
+            "roll_no": student.roll_no,
+            "name": student.name,
+            "program": student.program,
+            "section": student.section,
+        },
+    })
+
+
+@csrf_exempt
+@require_POST
+@_require_auth
 def agent_query(request):
     """
     POST /api/agent/query/
-    Body: { "query": "...", "roll_no": "COSC221103029", "session_id": "optional-uuid" }
-    Returns: { "response": "..." }
+    Header: Authorization: Bearer <token>
+    Body: { "query": "...", "session_id": "optional-uuid" }
+    Returns: { "response": "...", "session_id": "..." }
     """
     try:
         body = json.loads(request.body)
@@ -43,14 +112,11 @@ def agent_query(request):
         return JsonResponse({"error": "Invalid JSON."}, status=400)
 
     query = body.get("query", "").strip()
-    roll_no = body.get("roll_no", "").strip()
     session_id = body.get("session_id") or str(uuid.uuid4())
+    roll_no = request.authenticated_roll_no  # authoritative — from verified token
 
     if not query:
         return JsonResponse({"error": "Query is required."}, status=400)
-    is_valid_roll, error_response = _validate_roll_no(roll_no)
-    if not is_valid_roll:
-        return error_response
 
     thread_id = f"student_{roll_no}_{session_id}"
 
@@ -205,7 +271,10 @@ def admin_logs(request):
     """
     from .models import AgentLog
     roll_no = request.GET.get("roll_no")
-    limit = int(request.GET.get("limit", 50))
+    try:
+        limit = min(int(request.GET.get("limit", 50)), 200)
+    except (ValueError, TypeError):
+        limit = 50
 
     qs = AgentLog.objects.order_by("-created_at")
     if roll_no:

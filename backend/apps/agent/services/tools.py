@@ -313,6 +313,84 @@ def escalate_to_hod(complaint_id: int, reason: str) -> dict:
     }
 
 
+# ── Account / Auth Tool ───────────────────────────────────────────────────────
+
+@tool
+def change_password(roll_no: str, new_password: str) -> dict:
+    """
+    Change a student's login password.
+    First call: changes the password immediately.
+    Subsequent calls: logs a PasswordChangeRequest to DB and emails SFSC — the agent's
+    one-time change access has been used and further changes require SFSC assistance.
+    Always confirm the new_password with the student before calling this tool.
+    """
+    from apps.agent.models import StudentAuth, PasswordChangeRequest
+    from django.conf import settings
+    from django.core.mail import send_mail
+
+    student, err = _get_student(roll_no)
+    if err:
+        return err
+
+    if not new_password or len(new_password) < 6:
+        return {"error": "Password must be at least 6 characters."}
+
+    try:
+        auth = student.auth
+    except StudentAuth.DoesNotExist:
+        return {"error": "Authentication record not found. Contact SFSC."}
+
+    if not auth.password_changed:
+        auth.set_password(new_password)
+        auth.password_changed = True
+        auth.save()
+        return {
+            "success": True,
+            "message": "Your password has been changed successfully. Please use the new password on your next login.",
+        }
+
+    # One-time access already used — log request and email SFSC
+    req = PasswordChangeRequest.objects.create(
+        student=student,
+        requested_password=new_password,
+        status="pending",
+    )
+
+    email_body = (
+        f"Password Change Request — KFUEIT Agent Assist\n"
+        f"{'=' * 50}\n\n"
+        f"Student Name : {student.name}\n"
+        f"Roll No      : {roll_no}\n"
+        f"Request ID   : #{req.id}\n"
+        f"Requested Password: {new_password}\n\n"
+        f"Please update this student's password in the admin portal "
+        f"and mark Request #{req.id} as resolved.\n\n"
+        f"Admin Portal: {getattr(settings, 'ADMIN_PORTAL_URL', 'http://localhost:8000/admin/')}"
+    )
+
+    try:
+        send_mail(
+            subject=f"[KFUEIT] Password Change Request — {roll_no}",
+            message=email_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.SFSC_EMAIL],
+            fail_silently=True,
+        )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "request_id": req.id,
+        "message": (
+            f"I understand you'd like to change your password. "
+            f"My one-time password change access has already been used for your account. "
+            f"I've logged this request (Reference #{req.id}) and notified the SFSC department. "
+            f"They will update your password and get back to you shortly."
+        ),
+    }
+
+
 # ── Admissions / Policy Tool (Pinecone RAG) ───────────────────────────────────
 
 @tool

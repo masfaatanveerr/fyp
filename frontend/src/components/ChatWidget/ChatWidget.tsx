@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Vapi from "@vapi-ai/web";
 import ReactMarkdown from "react-markdown";
 import {
+  Eye,
+  EyeOff,
+  LogOut,
   MessageCircle,
   Phone,
   PhoneOff,
@@ -9,6 +12,7 @@ import {
   Sparkles,
   X,
   ChevronDown,
+  KeyRound,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -23,7 +27,6 @@ interface Message {
 }
 
 interface ChatWidgetProps {
-  rollNo?: string;
   agentName?: string;
   description?: string;
   apiBase?: string;
@@ -38,7 +41,14 @@ interface StudentInfo {
   section: string;
 }
 
+interface StoredSession {
+  token: string;
+  student: StudentInfo;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const SESSION_KEY = "kfueit_session";
 
 const QUICK_PROMPTS = [
   "What is my attendance?",
@@ -48,11 +58,30 @@ const QUICK_PROMPTS = [
 ];
 
 function makeId() {
-  return typeof crypto !== "undefined" ? crypto.randomUUID() : `id_${Date.now()}_${Math.random()}`;
+  return typeof crypto !== "undefined"
+    ? crypto.randomUUID()
+    : `id_${Date.now()}_${Math.random()}`;
 }
 
 function formatTime(d: Date) {
   return d.toLocaleTimeString("en-PK", { hour: "2-digit", minute: "2-digit" });
+}
+
+function loadSession(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as StoredSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session: StoredSession) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
 }
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
@@ -60,7 +89,9 @@ function formatTime(d: Date) {
 function TypingDots() {
   return (
     <div className="cw-typing">
-      <span /><span /><span />
+      <span />
+      <span />
+      <span />
     </div>
   );
 }
@@ -90,10 +121,139 @@ function MessageBubble({ msg }: { msg: Message }) {
   );
 }
 
+// ── Login screen ──────────────────────────────────────────────────────────────
+
+interface LoginScreenProps {
+  apiBase: string;
+  onSuccess: (session: StoredSession) => void;
+}
+
+function LoginScreen({ apiBase, onSuccess }: LoginScreenProps) {
+  const [rollInput, setRollInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const rollRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    rollRef.current?.focus();
+  }, []);
+
+  async function handleSubmit() {
+    const roll_no = rollInput.trim().toUpperCase();
+    const password = passwordInput.trim();
+    if (!roll_no || !password) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch(`${apiBase}/login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roll_no, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Login failed. Please try again.");
+      } else {
+        onSuccess({ token: data.token, student: data.student });
+      }
+    } catch {
+      setError("Could not connect to server. Is the backend running?");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onRollKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") passwordRef.current?.focus();
+  }
+
+  function onPasswordKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleSubmit();
+  }
+
+  return (
+    <div className="cw-login">
+      <div className="cw-login-icon">
+        <KeyRound size={26} />
+      </div>
+      <p className="cw-login-title">Student Login</p>
+      <p className="cw-login-sub">
+        Sign in with your roll number and password
+      </p>
+
+      <div className="cw-login-fields">
+        {/* Roll number */}
+        <div className="cw-field-group">
+          <label className="cw-field-label">Roll Number</label>
+          <input
+            ref={rollRef}
+            className="cw-field-input"
+            value={rollInput}
+            onChange={(e) => setRollInput(e.target.value)}
+            onKeyDown={onRollKeyDown}
+            placeholder="e.g. COSC221103029"
+            disabled={loading}
+            autoComplete="username"
+            style={{ textTransform: "uppercase" }}
+          />
+        </div>
+
+        {/* Password */}
+        <div className="cw-field-group">
+          <label className="cw-field-label">Password</label>
+          <div className="cw-password-wrap">
+            <input
+              ref={passwordRef}
+              className="cw-field-input cw-field-input--password"
+              type={showPassword ? "text" : "password"}
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={onPasswordKeyDown}
+              placeholder="Enter your password"
+              disabled={loading}
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="cw-password-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+
+        {error && <p className="cw-login-error">{error}</p>}
+
+        <button
+          className="cw-login-btn"
+          onClick={handleSubmit}
+          disabled={loading || !rollInput.trim() || !passwordInput.trim()}
+        >
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+      </div>
+
+      <p className="cw-login-hint">
+        Default password is your roll number reversed.
+        <br />
+        Ask the agent to change it after signing in.
+      </p>
+    </div>
+  );
+}
+
 // ── Main widget ───────────────────────────────────────────────────────────────
 
 export function ChatWidget({
-  rollNo: rollNoProp,
   agentName = "KFUEIT Agent",
   description = "AI University Assistant",
   apiBase = "http://127.0.0.1:8000/api/agent",
@@ -107,16 +267,8 @@ export function ChatWidget({
   const [showQuick, setShowQuick] = useState(true);
   const [sessionId] = useState(makeId);
 
-  // Roll number login state
-  const [student, setStudent] = useState<StudentInfo | null>(
-    rollNoProp ? { roll_no: rollNoProp, name: "", program: "", section: "" } : null
-  );
-  const [rollInput, setRollInput] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState("");
-  const rollInputRef = useRef<HTMLInputElement>(null);
-
-  const rollNo = student?.roll_no ?? "";
+  // Auth state — restored from localStorage on mount
+  const [session, setSession] = useState<StoredSession | null>(loadSession);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -138,34 +290,57 @@ export function ChatWidget({
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!open) return;
-    setTimeout(() => {
-      if (!student) rollInputRef.current?.focus();
-      else inputRef.current?.focus();
-    }, 120);
-  }, [open, student]);
+    if (open && session) {
+      setTimeout(() => inputRef.current?.focus(), 120);
+    }
+  }, [open, session]);
 
-  // Initialize Vapi instance and wire up events
+  // Initialize Vapi
   useEffect(() => {
     if (!vapiPublicKey || vapiRef.current) return;
     const v = new Vapi(vapiPublicKey);
     v.on("call-start", () => setCallActive(true));
-    v.on("call-end",   () => setCallActive(false));
+    v.on("call-end", () => setCallActive(false));
     v.on("error", (e: unknown) => {
       setCallActive(false);
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
       setMessages((prev) => [
         ...prev,
-        { id: makeId(), role: "assistant", content: `Voice call error: ${msg}`, ts: new Date() },
+        {
+          id: makeId(),
+          role: "assistant",
+          content: `Voice call error: ${msg}`,
+          ts: new Date(),
+        },
       ]);
     });
     vapiRef.current = v;
   }, [vapiPublicKey]);
 
+  function handleLoginSuccess(newSession: StoredSession) {
+    saveSession(newSession);
+    setSession(newSession);
+  }
+
+  function handleLogout() {
+    clearSession();
+    setSession(null);
+    setMessages([
+      {
+        id: "welcome",
+        role: "assistant",
+        content:
+          "**Hello!** I'm KFUEIT Agent Assist.\n\nYou can ask me about your attendance, transcript, courses, or university policies.",
+        ts: new Date(),
+      },
+    ]);
+    setShowQuick(true);
+  }
+
   const sendMessage = useCallback(
     async (text?: string) => {
       const query = (text ?? input).trim();
-      if (!query || loading) return;
+      if (!query || loading || !session) return;
 
       setShowQuick(false);
       setInput("");
@@ -178,16 +353,38 @@ export function ChatWidget({
       try {
         const res = await fetch(`${apiBase}/query/`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, roll_no: rollNo, session_id: sessionId }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.token}`,
+          },
+          body: JSON.stringify({ query, session_id: sessionId }),
         });
+
+        // Session expired — force logout
+        if (res.status === 401) {
+          handleLogout();
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: makeId(),
+              role: "assistant",
+              content: "Your session has expired. Please sign in again.",
+              ts: new Date(),
+            },
+          ]);
+          return;
+        }
+
         const data = await res.json();
         setMessages((prev) => [
           ...prev,
           {
             id: makeId(),
             role: "assistant",
-            content: data.response || data.error || "Sorry, could not get a valid response.",
+            content:
+              data.response ||
+              data.error ||
+              "Sorry, could not get a valid response.",
             ts: new Date(),
           },
         ]);
@@ -205,28 +402,8 @@ export function ChatWidget({
         setLoading(false);
       }
     },
-    [input, loading, apiBase, rollNo, sessionId]
+    [input, loading, apiBase, session, sessionId]
   );
-
-  async function handleLogin() {
-    const rn = rollInput.trim().toUpperCase();
-    if (!rn) return;
-    setLoginLoading(true);
-    setLoginError("");
-    try {
-      const res = await fetch(`${apiBase}/student/${rn}/`);
-      const data = await res.json();
-      if (!res.ok) {
-        setLoginError(data.error || "Student not found.");
-      } else {
-        setStudent((data.profile ?? data) as StudentInfo);
-      }
-    } catch {
-      setLoginError("Could not connect to backend. Is the server running?");
-    } finally {
-      setLoginLoading(false);
-    }
-  }
 
   async function toggleCall() {
     if (!vapiAssistantId || !vapiRef.current) {
@@ -235,7 +412,8 @@ export function ChatWidget({
         {
           id: makeId(),
           role: "assistant",
-          content: "Voice call is not configured. Set `VITE_VAPI_PUBLIC_KEY` and `VITE_VAPI_ASSISTANT_ID` in `frontend/.env`.",
+          content:
+            "Voice call is not configured. Set `VITE_VAPI_PUBLIC_KEY` and `VITE_VAPI_ASSISTANT_ID` in `frontend/.env`.",
           ts: new Date(),
         },
       ]);
@@ -246,7 +424,7 @@ export function ChatWidget({
     } else {
       try {
         await vapiRef.current.start(vapiAssistantId, {
-          variableValues: { roll_no: rollNo },
+          variableValues: { roll_no: session?.student.roll_no },
         } as any);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -266,13 +444,20 @@ export function ChatWidget({
   return (
     <>
       {/* FAB */}
-      <button className="cw-fab" onClick={() => setOpen((v) => !v)} aria-label="Toggle chat">
+      <button
+        className="cw-fab"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Toggle chat"
+      >
         {!open && <span className="cw-fab-pulse" />}
         {open ? <X size={22} /> : <MessageCircle size={22} />}
       </button>
 
       {/* Panel */}
-      <div className={`cw-panel${open ? " cw-panel--open" : ""}`} aria-hidden={!open}>
+      <div
+        className={`cw-panel${open ? " cw-panel--open" : ""}`}
+        aria-hidden={!open}
+      >
         {/* Header */}
         <header className="cw-header">
           <div className="cw-header-identity">
@@ -283,12 +468,14 @@ export function ChatWidget({
               <p className="cw-header-name">{agentName}</p>
               <p className="cw-header-sub">
                 <span className="cw-online-dot" />
-                {student ? `${student.name} · ${student.roll_no}` : description}
+                {session
+                  ? `${session.student.name} · ${session.student.roll_no}`
+                  : description}
               </p>
             </div>
           </div>
           <div className="cw-header-actions">
-            {student && (
+            {session && (
               <button
                 className={`cw-icon-btn${callActive ? " cw-icon-btn--danger" : ""}`}
                 onClick={toggleCall}
@@ -297,50 +484,28 @@ export function ChatWidget({
                 {callActive ? <PhoneOff size={15} /> : <Phone size={15} />}
               </button>
             )}
-            {student && (
+            {session && (
               <button
                 className="cw-icon-btn"
-                onClick={() => { setStudent(null); setRollInput(""); }}
-                title="Switch student"
+                onClick={handleLogout}
+                title="Sign out"
               >
-                <X size={15} />
+                <LogOut size={15} />
               </button>
             )}
-            <button className="cw-icon-btn" onClick={() => setOpen(false)} title="Minimize">
+            <button
+              className="cw-icon-btn"
+              onClick={() => setOpen(false)}
+              title="Minimize"
+            >
               <ChevronDown size={15} />
             </button>
           </div>
         </header>
 
         {/* Login screen */}
-        {!student ? (
-          <div className="cw-login">
-            <div className="cw-login-icon"><Sparkles size={28} /></div>
-            <p className="cw-login-title">KFUEIT Student Portal</p>
-            <p className="cw-login-sub">Enter your roll number</p>
-            <div className="cw-input-wrap" style={{ margin: "0 0 8px" }}>
-              <input
-                ref={rollInputRef}
-                className="cw-input"
-                value={rollInput}
-                onChange={(e) => setRollInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                placeholder="e.g. COSC221103029"
-                disabled={loginLoading}
-                style={{ textTransform: "uppercase" }}
-              />
-              <button
-                className="cw-send"
-                onClick={handleLogin}
-                disabled={loginLoading || !rollInput.trim()}
-                aria-label="Login"
-              >
-                <Send size={16} />
-              </button>
-            </div>
-            {loginLoading && <p className="cw-login-sub">Verifying...</p>}
-            {loginError && <p className="cw-login-error">{loginError}</p>}
-          </div>
+        {!session ? (
+          <LoginScreen apiBase={apiBase} onSuccess={handleLoginSuccess} />
         ) : (
           <>
             {/* Messages */}
@@ -350,8 +515,12 @@ export function ChatWidget({
               ))}
               {loading && (
                 <div className="cw-row cw-row--assistant">
-                  <div className="cw-avatar"><Sparkles size={13} /></div>
-                  <div className="cw-bubble cw-bubble--assistant"><TypingDots /></div>
+                  <div className="cw-avatar">
+                    <Sparkles size={13} />
+                  </div>
+                  <div className="cw-bubble cw-bubble--assistant">
+                    <TypingDots />
+                  </div>
                 </div>
               )}
               <div ref={bottomRef} />
@@ -361,7 +530,12 @@ export function ChatWidget({
             {showQuick && !hasInteracted && (
               <div className="cw-quick">
                 {QUICK_PROMPTS.map((p) => (
-                  <button key={p} className="cw-quick-btn" onClick={() => sendMessage(p)} disabled={loading}>
+                  <button
+                    key={p}
+                    className="cw-quick-btn"
+                    onClick={() => sendMessage(p)}
+                    disabled={loading}
+                  >
                     {p}
                   </button>
                 ))}
@@ -370,8 +544,8 @@ export function ChatWidget({
           </>
         )}
 
-        {/* Input — only shown when logged in */}
-        {student && (
+        {/* Input footer — only when signed in */}
+        {session && (
           <footer className="cw-footer">
             <div className="cw-input-wrap">
               <input
@@ -379,7 +553,9 @@ export function ChatWidget({
                 className="cw-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && !e.shiftKey && sendMessage()
+                }
                 placeholder="Type your question..."
                 disabled={loading}
               />

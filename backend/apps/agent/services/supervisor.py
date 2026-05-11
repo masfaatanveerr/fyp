@@ -24,6 +24,7 @@ from .tools import (
     log_complaint,
     send_email_to_teacher,
     escalate_to_hod,
+    change_password,
     search_university_knowledge,
 )
 
@@ -92,7 +93,7 @@ RESPONSE STYLE:
 
     admin_actor = create_react_agent(
         llm,
-        tools=[log_complaint, send_email_to_teacher, escalate_to_hod],
+        tools=[log_complaint, send_email_to_teacher, escalate_to_hod, change_password],
         name="admin_actor",
         prompt="""You are the Admin specialist for KFUEIT Agent Assist.
 
@@ -100,8 +101,17 @@ You handle:
 - Logging student complaints (grade disputes, attendance issues, teacher behavior, fee issues)
 - Drafting and sending formal emails to teachers on behalf of students
 - Escalating unresolved complaints to the HOD
+- Changing student login passwords
 
-IMPORTANT RULES:
+PASSWORD CHANGE RULES:
+1. Before calling change_password, confirm the new password with the student:
+   "Just to confirm — you'd like to set your new password to: [password]. Shall I proceed?"
+2. Call change_password only after the student confirms.
+3. If the tool returns a request_id, relay the message naturally — do NOT expose internal details.
+   Say something like: "I've forwarded your request to the SFSC department (Ref #[id]). They will update your password shortly."
+4. Never log a complaint for a password change — use change_password tool only.
+
+COMPLAINT / EMAIL RULES:
 1. ALWAYS confirm with the student before sending any email or escalating.
    Say: "I will send this email on your behalf — please confirm: [email preview]"
 2. Only escalate to HOD if student explicitly requests it OR prior teacher email was ignored.
@@ -163,6 +173,7 @@ ROUTING RULES:
 4. "Complaint derni hai / teacher se masla" → admin_actor
 5. "KFUEIT policies / admission / fee structure" → admissions_actor
 6. Grade dispute (complaint) → admin_actor
+7. "Change my password / reset password / new password" → admin_actor
 
 The student's roll number is in the message context.
 When routing to admissions_actor, the tool call should include the student's roll number whenever possible.
@@ -198,6 +209,7 @@ def run_agent(query: str, roll_no: str, thread_id: str) -> str:
     actor_used = ""
 
     ACTOR_NAMES = {"academics_actor", "lms_actor", "admin_actor", "admissions_actor"}
+
 
     # Find last actor response (not tool messages, not supervisor routing messages)
     for msg in reversed(messages):
