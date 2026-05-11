@@ -4,14 +4,25 @@ USE_DUMMY_DATA=True  → queries PostgreSQL (demo)
 USE_DUMMY_DATA=False → queries LMS MySQL (production)
 """
 import requests
+from contextvars import ContextVar
 from django.conf import settings
 from langchain_core.tools import tool
 
 from .pinecone_api import search_text_records
 from .pinecone_utils import extract_roll_no_from_text, get_query_namespaces
 
+# Set once per request in run_agent; prevents LLM from fetching another student's data.
+_auth_roll_no: ContextVar[str] = ContextVar("_auth_roll_no", default="")
+
+
+def set_authenticated_roll_no(roll_no: str) -> None:
+    _auth_roll_no.set(roll_no)
+
 
 def _get_student(roll_no: str):
+    auth = _auth_roll_no.get()
+    if auth and roll_no != auth:
+        return None, {"error": "Access denied. You can only access your own data."}
     from apps.agent.models import StudentProfile
     try:
         return StudentProfile.objects.get(roll_no=roll_no), None

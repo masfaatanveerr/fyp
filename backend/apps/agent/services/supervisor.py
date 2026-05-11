@@ -16,6 +16,7 @@ from langgraph.prebuilt import create_react_agent
 from langgraph_supervisor import create_supervisor
 
 from .tools import (
+    set_authenticated_roll_no,
     get_student_info,
     get_current_courses,
     get_student_attendance,
@@ -195,6 +196,7 @@ def get_supervisor():
 
 def run_agent(query: str, roll_no: str, thread_id: str) -> str:
     """Main entry point called by Django view. Returns final text response."""
+    set_authenticated_roll_no(roll_no)   # pin roll_no for every tool call in this request
     graph = get_supervisor()
     config = {"configurable": {"thread_id": thread_id}}
     full_query = f"[Student Roll No: {roll_no}]\n\n{query}"
