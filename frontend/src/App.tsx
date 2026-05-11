@@ -4,7 +4,13 @@ import { GraduationCap } from "lucide-react";
 
 const isAdmin = window.location.hash === "#admin";
 
-const NAV_LINKS = ["About", "Programs", "Admissions", "Research", "Campus Life"];
+const NAV_LINKS = [
+  { label: "About",       href: "https://www.kfueit.edu.pk/kfueit-historical-background" },
+  { label: "Programs",    href: "https://www.kfueit.edu.pk/academic-programs" },
+  { label: "Admissions",  href: "https://www.kfueit.edu.pk/why-kfueit" },
+  { label: "Research",    href: "https://www.kfueit.edu.pk/research-1" },
+  { label: "Campus Life", href: "https://www.kfueit.edu.pk/events-attractions" },
+];
 
 const STATS = [
   { value: "12K+", label: "Students" },
@@ -40,13 +46,13 @@ export default function App() {
 
           <ul className="nav-links">
             {NAV_LINKS.map((l) => (
-              <li key={l}>
-                <a href="#" className="nav-link">{l}</a>
+              <li key={l.label}>
+                <a href={l.href} target="_blank" rel="noopener noreferrer" className="nav-link">{l.label}</a>
               </li>
             ))}
           </ul>
 
-          <a href="#" className="nav-cta">
+          <a href="https://eportal.kfueit.edu.pk/login" target="_blank" rel="noopener noreferrer" className="nav-cta">
             Apply now <span className="nav-cta-arrow">→</span>
           </a>
         </div>
@@ -73,10 +79,10 @@ export default function App() {
           </p>
 
           <div className="hero-actions">
-            <a href="#" className="btn-primary">
+            <a href="https://www.kfueit.edu.pk/academic-programs" target="_blank" rel="noopener noreferrer" className="btn-primary">
               Explore Programs <span>→</span>
             </a>
-            <a href="#" className="btn-ghost">Take a virtual tour</a>
+            <a href="https://www.kfueit.edu.pk" target="_blank" rel="noopener noreferrer" className="btn-ghost">Take a virtual tour</a>
           </div>
         </div>
 
